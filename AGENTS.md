@@ -10,18 +10,18 @@ Stack: Vite, React 19, TypeScript (strict), Tailwind CSS v4 (`@tailwindcss/vite`
 
 ## Commands
 
-| Command               | Purpose                                                   |
-| --------------------- | --------------------------------------------------------- |
-| `npm run dev`         | Dev server at http://127.0.0.1:5173/sp-album-playlist/    |
-| `npm run build`       | `tsc -b` + production build to `dist/`                    |
-| `npm run preview`     | Serve `dist/` at http://127.0.0.1:4173/sp-album-playlist/ |
-| `npm run lint`        | ESLint                                                    |
-| `npm run typecheck`   | `tsc -b` (no emit)                                        |
-| `npm test`            | Unit tests (Vitest, jsdom)                                |
-| `npm run e2e:install` | Install Chromium and WebKit for Playwright                |
-| `npm run test:e2e`    | Playwright (builds and serves the preview itself)         |
-| `npm run icons`       | Regenerate icons from `public/icon.svg`                   |
-| `npm run format`      | Prettier                                                  |
+| Command               | Purpose                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `npm run dev`         | Dev server at http://127.0.0.1:15555/sp-album-playlist/    |
+| `npm run build`       | `tsc -b` + production build to `dist/`                     |
+| `npm run preview`     | Serve `dist/` at http://127.0.0.1:15556/sp-album-playlist/ |
+| `npm run lint`        | ESLint                                                     |
+| `npm run typecheck`   | `tsc -b` (no emit)                                         |
+| `npm test`            | Unit tests (Vitest, jsdom)                                 |
+| `npm run e2e:install` | Install Chromium and WebKit for Playwright                 |
+| `npm run test:e2e`    | Playwright (builds and serves the preview itself)          |
+| `npm run icons`       | Regenerate icons from `public/icon.svg`                    |
+| `npm run format`      | Prettier                                                   |
 
 Before finishing a change, run `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, and `npx prettier --check .`. Run `npm run test:e2e` when UI text, roles, or flows change.
 

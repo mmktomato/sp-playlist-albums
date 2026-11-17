@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 import { BASE_PATH } from './app.config.ts'
 import { E2E_CLIENT_ID } from './tests/e2e/support/constants.ts'
 
-const PREVIEW_ORIGIN = 'http://127.0.0.1:4173'
+const PREVIEW_ORIGIN = 'http://127.0.0.1:15556'
 
 export default defineConfig({
   testDir: './tests',
