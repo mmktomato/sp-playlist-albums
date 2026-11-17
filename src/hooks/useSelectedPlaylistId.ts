@@ -22,7 +22,7 @@ export function useSelectedPlaylistId(): [string | null, (id: string) => void] {
   const select = useCallback((id: string) => {
     if (id === getSnapshot()) return
     const url = new URL(location.href)
-    url.searchParams.set(PLAYLIST_PARAM, id)
+    url.search = new URLSearchParams({ [PLAYLIST_PARAM]: id }).toString()
     history.pushState(history.state, '', url)
     for (const listener of listeners) listener()
   }, [])

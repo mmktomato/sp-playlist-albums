@@ -236,6 +236,17 @@ describe('playlist drawer', () => {
     expect(menuButton()).toHaveFocus()
   })
 
+  it('drops other query parameters when selecting a playlist', async () => {
+    renderApp('?ubi=x')
+    const drawer = await openDrawer()
+
+    await userEvent.click(
+      within(drawer).getByRole('button', { name: /My Mix/ }),
+    )
+
+    expect(location.search).toBe('?playlist=mine')
+  })
+
   it('closes with Escape and returns focus to the menu button', async () => {
     renderApp()
     const drawer = await openDrawer()
