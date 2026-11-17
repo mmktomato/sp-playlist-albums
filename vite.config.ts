@@ -39,6 +39,7 @@ function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   base: BASE_PATH,
+  clearScreen: false,
   plugins: [
     react(),
     tailwindcss(),
