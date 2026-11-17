@@ -53,7 +53,7 @@ export default defineConfig({
       ],
       manifest: {
         id: BASE_PATH,
-        name: 'Playlist Albums',
+        name: 'Playlist Albums for Spotify',
         short_name: 'PL Albums',
         description:
           'See every album in a Spotify playlist, without duplicates',

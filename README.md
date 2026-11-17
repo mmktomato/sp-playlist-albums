@@ -1,4 +1,4 @@
-# Playlist Albums
+# Playlist Albums for Spotify
 
 A mobile web app (PWA) that lists the albums in a Spotify playlist, without duplicates.
 
@@ -10,7 +10,7 @@ A mobile web app (PWA) that lists the albums in a Spotify playlist, without dupl
 ## Using the app
 
 1. Ask the instance owner to add your Spotify account to their app's User Management.
-2. Open the instance URL (e.g. `https://<user>.github.io/sp-album-playlist/`) and log in.
+2. Open the instance URL (e.g. `https://<user>.github.io/sp-playlist-albums/`) and log in.
 3. Optionally, add it to your home screen.
 
 ## Limitations
@@ -27,8 +27,8 @@ Spotify restricts apps in Development Mode.
 
 1. In the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), create an app.
    - Redirect URIs (exact match, with the trailing slash):
-     - `https://<user>.github.io/sp-album-playlist/`
-     - `http://127.0.0.1:15555/sp-album-playlist/` (local development)
+     - `https://<user>.github.io/sp-playlist-albums/`
+     - `http://127.0.0.1:15555/sp-playlist-albums/` (local development)
    - APIs: Web API.
    - User Management: add the accounts that will use the app.
 2. In the GitHub repository settings:
@@ -44,7 +44,7 @@ echo 'VITE_SPOTIFY_CLIENT_ID=<your client id>' > .env.local
 npm run dev
 ```
 
-Open http://127.0.0.1:15555/sp-album-playlist/ (`localhost` doesn't work with Spotify).
+Open http://127.0.0.1:15555/sp-playlist-albums/ (`localhost` doesn't work with Spotify).
 Add `?debug=1` to see raw Spotify API responses.
 
 See [AGENTS.md](AGENTS.md) for commands, project layout and design notes.

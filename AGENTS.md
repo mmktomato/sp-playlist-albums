@@ -4,24 +4,24 @@ Guide for coding agents and contributors. User-facing setup lives in [README.md]
 
 ## Project
 
-Mobile-first PWA that lists the albums of a Spotify playlist (deduplicated, in first-appearance order). No backend: Spotify Authorization Code + PKCE in the browser, static hosting on GitHub Pages at `/sp-album-playlist/`. UI text is English.
+Mobile-first PWA that lists the albums of a Spotify playlist (deduplicated, in first-appearance order). No backend: Spotify Authorization Code + PKCE in the browser, static hosting on GitHub Pages at `/sp-playlist-albums/`. UI text is English.
 
 Stack: Vite, React 19, TypeScript (strict), Tailwind CSS v4 (`@tailwindcss/vite`), TanStack Query v5, `vite-plugin-pwa`, Vitest + Testing Library, Playwright.
 
 ## Commands
 
-| Command               | Purpose                                                    |
-| --------------------- | ---------------------------------------------------------- |
-| `npm run dev`         | Dev server at http://127.0.0.1:15555/sp-album-playlist/    |
-| `npm run build`       | `tsc -b` + production build to `dist/`                     |
-| `npm run preview`     | Serve `dist/` at http://127.0.0.1:15556/sp-album-playlist/ |
-| `npm run lint`        | ESLint                                                     |
-| `npm run typecheck`   | `tsc -b` (no emit)                                         |
-| `npm test`            | Unit tests (Vitest, jsdom)                                 |
-| `npm run e2e:install` | Install Chromium and WebKit for Playwright                 |
-| `npm run test:e2e`    | Playwright (builds and serves the preview itself)          |
-| `npm run icons`       | Regenerate icons from `public/icon.svg`                    |
-| `npm run format`      | Prettier                                                   |
+| Command               | Purpose                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `npm run dev`         | Dev server at http://127.0.0.1:15555/sp-playlist-albums/    |
+| `npm run build`       | `tsc -b` + production build to `dist/`                      |
+| `npm run preview`     | Serve `dist/` at http://127.0.0.1:15556/sp-playlist-albums/ |
+| `npm run lint`        | ESLint                                                      |
+| `npm run typecheck`   | `tsc -b` (no emit)                                          |
+| `npm test`            | Unit tests (Vitest, jsdom)                                  |
+| `npm run e2e:install` | Install Chromium and WebKit for Playwright                  |
+| `npm run test:e2e`    | Playwright (builds and serves the preview itself)           |
+| `npm run icons`       | Regenerate icons from `public/icon.svg`                     |
+| `npm run format`      | Prettier                                                    |
 
 Before finishing a change, run `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, and `npx prettier --check .`. Run `npm run test:e2e` when UI text, roles, or flows change.
 

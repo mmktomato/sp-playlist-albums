@@ -23,7 +23,7 @@ import { ErrorState } from './states/ErrorState'
 import { LoadingState } from './states/LoadingState'
 import { ActionButton, StatusMessage } from './states/StatusMessage'
 
-const APP_TITLE = 'Playlist Albums'
+const APP_TITLE = 'Playlist Albums for Spotify'
 
 export function MainScreen() {
   const queryClient = useQueryClient()

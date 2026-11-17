@@ -454,7 +454,10 @@ describe('error states', () => {
       within(alert).getByRole('button', { name: 'Retry' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Playlist Albums' }),
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Playlist Albums for Spotify',
+      }),
     ).toBeInTheDocument()
   })
 

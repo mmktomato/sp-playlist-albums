@@ -24,7 +24,7 @@ import {
   spotifyError,
 } from './support/spotifyMock.ts'
 
-const APP_TITLE = 'Playlist Albums'
+const APP_TITLE = 'Playlist Albums for Spotify'
 
 test.describe('login redirect', () => {
   test.use({ auth: 'none' })

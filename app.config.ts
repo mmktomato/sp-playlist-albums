@@ -1,1 +1,1 @@
-export const BASE_PATH = '/sp-album-playlist/'
+export const BASE_PATH = '/sp-playlist-albums/'

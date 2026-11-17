@@ -9,8 +9,8 @@ export type StoredPkce = {
   state: string
 }
 
-export const TOKENS_KEY = 'sp-album-playlist.auth.tokens'
-export const PKCE_KEY = 'sp-album-playlist.auth.pkce'
+export const TOKENS_KEY = 'sp-playlist-albums.auth.tokens'
+export const PKCE_KEY = 'sp-playlist-albums.auth.pkce'
 
 function readJson(key: string): unknown {
   try {

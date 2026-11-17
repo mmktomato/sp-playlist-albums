@@ -41,7 +41,7 @@ export function LoginScreen({
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-center">
-      <h1 className="text-2xl font-bold">Playlist Albums</h1>
+      <h1 className="text-2xl font-bold">Playlist Albums for Spotify</h1>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
         See every album in your Spotify playlists
       </p>

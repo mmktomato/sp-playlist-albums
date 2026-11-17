@@ -7,7 +7,7 @@ describe('getRedirectUri', () => {
   })
 
   it('combines the origin and the base path', () => {
-    vi.stubEnv('BASE_URL', '/sp-album-playlist/')
-    expect(getRedirectUri()).toBe(`${location.origin}/sp-album-playlist/`)
+    vi.stubEnv('BASE_URL', '/sp-playlist-albums/')
+    expect(getRedirectUri()).toBe(`${location.origin}/sp-playlist-albums/`)
   })
 })

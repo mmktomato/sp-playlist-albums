@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { BASE_PATH } from '../../app.config.ts'
 
-const APP_TITLE = 'Playlist Albums'
+const APP_TITLE = 'Playlist Albums for Spotify'
 
 type ManifestIcon = {
   src: string
