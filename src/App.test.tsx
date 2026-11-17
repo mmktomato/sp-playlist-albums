@@ -185,36 +185,16 @@ describe('playlist drawer', () => {
       within(saved)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual([
-      expect.stringContaining('Shared Collab'),
-      expect.stringContaining('Friend Picks'),
-      expect.stringContaining('Release Radar'),
-    ])
+    ).toEqual([expect.stringContaining('Shared Collab')])
+    expect(
+      within(drawer).queryByRole('button', { name: /Friend Picks/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(drawer).queryByRole('button', { name: /Release Radar/ }),
+    ).not.toBeInTheDocument()
     expect(
       within(drawer).getByRole('button', { name: 'Log out' }),
     ).toBeInTheDocument()
-  })
-
-  it('grays out inaccessible playlists with a reason and keeps them unselectable', async () => {
-    renderApp()
-    const drawer = await openDrawer()
-
-    const restricted = within(drawer).getByRole('button', {
-      name: /Friend Picks/,
-    })
-    expect(restricted).toHaveAttribute('aria-disabled', 'true')
-    expect(restricted).toHaveAccessibleDescription(
-      'Unavailable due to Spotify restrictions',
-    )
-    expect(
-      within(drawer).getByRole('button', { name: /Shared Collab/ }),
-    ).not.toHaveAttribute('aria-disabled')
-
-    await userEvent.click(restricted)
-
-    expect(location.search).toBe('')
-    expect(screen.getByRole('dialog', { name: 'Playlists' })).toBeVisible()
-    expect(getPlaylistItems).not.toHaveBeenCalled()
   })
 
   it('selects a playlist, closes the drawer and updates the URL', async () => {

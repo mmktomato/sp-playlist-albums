@@ -2,8 +2,6 @@ import { useEffect, useId, useRef, type RefObject } from 'react'
 import { isAccessible } from '../domain/playlists'
 import type { PlaylistSummary } from '../domain/types'
 
-const RESTRICTED_REASON = 'Unavailable due to Spotify restrictions'
-
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
@@ -164,6 +162,7 @@ function PlaylistSection({
   onSelect,
 }: PlaylistSectionProps) {
   const headingId = useId()
+  const visible = playlists.filter((playlist) => isAccessible(playlist, meId))
   return (
     <section aria-labelledby={headingId} className="py-2">
       <h2
@@ -172,15 +171,14 @@ function PlaylistSection({
       >
         {title}
       </h2>
-      {playlists.length === 0 ? (
+      {visible.length === 0 ? (
         <p className="px-4 py-2 text-sm text-neutral-500">No playlists</p>
       ) : (
         <ul>
-          {playlists.map((playlist) => (
+          {visible.map((playlist) => (
             <li key={playlist.id}>
               <PlaylistItem
                 playlist={playlist}
-                accessible={isAccessible(playlist, meId)}
                 selected={playlist.id === selectedId}
                 onSelect={onSelect}
               />
@@ -194,43 +192,24 @@ function PlaylistSection({
 
 type PlaylistItemProps = {
   playlist: PlaylistSummary
-  accessible: boolean
   selected: boolean
   onSelect: (playlistId: string) => void
 }
 
-function PlaylistItem({
-  playlist,
-  accessible,
-  selected,
-  onSelect,
-}: PlaylistItemProps) {
-  const reasonId = useId()
+function PlaylistItem({ playlist, selected, onSelect }: PlaylistItemProps) {
   return (
     <button
       type="button"
-      aria-disabled={accessible ? undefined : true}
-      aria-describedby={accessible ? undefined : reasonId}
       aria-current={selected ? 'true' : undefined}
-      onClick={() => {
-        if (accessible) onSelect(playlist.id)
-      }}
-      className={`flex w-full flex-col items-start px-4 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-green-500 ${
-        accessible
-          ? 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
-          : 'cursor-not-allowed opacity-50'
-      } ${selected ? 'bg-neutral-100 font-semibold dark:bg-neutral-800' : ''}`}
+      onClick={() => onSelect(playlist.id)}
+      className={`flex w-full flex-col items-start px-4 py-2 text-left hover:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-green-500 dark:hover:bg-neutral-800 ${
+        selected ? 'bg-neutral-100 font-semibold dark:bg-neutral-800' : ''
+      }`}
     >
       <span className="w-full truncate text-sm">{playlist.name}</span>
-      {accessible ? (
-        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-          {playlist.ownerName}
-        </span>
-      ) : (
-        <span id={reasonId} className="text-xs text-neutral-500">
-          {RESTRICTED_REASON}
-        </span>
-      )}
+      <span className="text-xs text-neutral-500 dark:text-neutral-400">
+        {playlist.ownerName}
+      </span>
     </button>
   )
 }

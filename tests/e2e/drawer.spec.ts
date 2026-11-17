@@ -3,8 +3,6 @@ import { LOGIN_BUTTON, SELECT_PROMPT } from './support/constants.ts'
 import { PLAYLISTS } from './support/data.ts'
 import { expect, readStoredTokens, test } from './support/fixtures.ts'
 
-const RESTRICTED_REASON = 'Unavailable due to Spotify restrictions'
-
 async function openDrawer(page: Page) {
   const menuButton = page.getByRole('button', { name: 'Menu' })
   await menuButton.click()
@@ -14,7 +12,7 @@ async function openDrawer(page: Page) {
   return { menuButton, drawer }
 }
 
-test('drawer lists owned and saved playlists and greys out restricted ones', async ({
+test('drawer lists owned and saved playlists and hides restricted ones', async ({
   page,
 }) => {
   await page.goto('./')
@@ -31,23 +29,15 @@ test('drawer lists owned and saved playlists and greys out restricted ones', asy
     owned.getByRole('button', { name: PLAYLISTS.second.name }),
   ).toBeEnabled()
 
-  await expect(saved.getByRole('button')).toHaveCount(3)
-  const shared = saved.getByRole('button', { name: PLAYLISTS.shared.name })
-  await expect(shared).not.toHaveAttribute('aria-disabled', 'true')
-  await expect(shared).not.toContainText(RESTRICTED_REASON)
-
+  await expect(saved.getByRole('button')).toHaveCount(1)
+  await expect(
+    saved.getByRole('button', { name: PLAYLISTS.shared.name }),
+  ).toBeEnabled()
   for (const restricted of [PLAYLISTS.friend, PLAYLISTS.radar]) {
-    const item = saved.getByRole('button', { name: restricted.name })
-    await expect(item).toHaveAttribute('aria-disabled', 'true')
-    await expect(item).toHaveAccessibleDescription(RESTRICTED_REASON)
-    await expect(item).toContainText(RESTRICTED_REASON)
+    await expect(
+      drawer.getByRole('button', { name: restricted.name }),
+    ).toHaveCount(0)
   }
-
-  await saved
-    .getByRole('button', { name: PLAYLISTS.friend.name })
-    .click({ force: true })
-  await expect(drawer).toBeVisible()
-  await expect(page).toHaveURL((url) => !url.searchParams.has('playlist'))
 
   await page.keyboard.press('Escape')
   await expect(drawer).toBeHidden()
