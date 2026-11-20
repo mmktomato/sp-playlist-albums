@@ -112,6 +112,7 @@ test.describe('authorization callback', () => {
     expect(await readStoredTokens(page)).toMatchObject({
       accessToken: CODE_ACCESS_TOKEN,
       refreshToken: CODE_REFRESH_TOKEN,
+      scope: REQUIRED_SCOPES.join(' '),
     })
     expect(await readStoredPkce(page)).toBeNull()
     expect(
@@ -181,6 +182,7 @@ test.describe('expired access token', () => {
     expect(await readStoredTokens(page)).toMatchObject({
       accessToken: REFRESHED_ACCESS_TOKEN,
       refreshToken: STORED_REFRESH_TOKEN,
+      scope: REQUIRED_SCOPES.join(' '),
     })
   })
 

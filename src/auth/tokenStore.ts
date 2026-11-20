@@ -2,6 +2,7 @@ export type StoredTokens = {
   accessToken: string
   refreshToken?: string
   expiresAt: number
+  scope?: string
 }
 
 export type StoredPkce = {
@@ -39,6 +40,7 @@ export function loadTokens(): StoredTokens | null {
     refreshToken:
       typeof value.refreshToken === 'string' ? value.refreshToken : undefined,
     expiresAt: value.expiresAt,
+    scope: typeof value.scope === 'string' ? value.scope : undefined,
   }
 }
 

@@ -1,12 +1,16 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getGrantedScopes } from '../auth/auth'
 import { ForbiddenError } from '../errors'
 import * as endpoints from '../spotify/endpoints'
 import type { SpotifySimplifiedPlaylist } from '../spotify/types'
 import DebugPage from './DebugPage'
 
-vi.mock('../auth/auth', () => ({ logout: vi.fn() }))
+vi.mock('../auth/auth', () => ({
+  logout: vi.fn(),
+  getGrantedScopes: vi.fn(() => []),
+}))
 
 vi.mock('../spotify/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../spotify/endpoints')>()
@@ -76,6 +80,31 @@ describe('DebugPage', () => {
       within(screen.getByTestId('playlist-radar')).getByText('Made for You?'),
     ).toBeInTheDocument()
     expect(screen.getByTestId('image-hosts')).toHaveTextContent('i.scdn.co')
+  })
+
+  it('shows the granted scopes', async () => {
+    vi.mocked(getGrantedScopes).mockReturnValueOnce([
+      'playlist-read-private',
+      'playlist-modify-public',
+    ])
+    render(<DebugPage />)
+
+    const list = screen.getByTestId('granted-scopes')
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['playlist-read-private', 'playlist-modify-public'])
+    expect(await screen.findByTestId('me-id')).toHaveTextContent('me')
+  })
+
+  it('notes when no scopes are recorded', async () => {
+    render(<DebugPage />)
+
+    expect(screen.getByTestId('granted-scopes')).toHaveTextContent(
+      '(none recorded)',
+    )
+    expect(await screen.findByTestId('me-id')).toHaveTextContent('me')
   })
 
   it('shows the error class when a selected playlist is forbidden', async () => {

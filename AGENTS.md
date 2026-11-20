@@ -70,6 +70,7 @@ Whether a playlist is selectable is decided only by `isAccessible` in `src/domai
   - Refresh is single-flight within a tab and serialized across tabs with `navigator.locks`. Pass the rejected token as `getAccessToken({ rejectedToken })` so parallel 401s refresh only once.
   - Clear tokens only on `invalid_grant`. Network errors and 5xx must not log the user out.
   - Logout and `AuthError` reload the page (`location.replace(BASE_URL)`). There is no auth-state event system.
+  - The granted `scope` is stored with the tokens (kept from the previous token when a refresh omits it). Tokens issued before a scope was added lack it, so check `hasGrantedScopes` first and ask the user to log in again. `?debug=1` shows the granted scopes.
 - API client: max 4 concurrent requests. Retry a 401 once with a fresh token. Retry a 429 only when `Retry-After` is at most 10 s, at most twice. Pass `AbortSignal` everywhere, and never turn `AbortError` into `NetworkError`.
 - TanStack Query: `networkMode: 'always'`, `retry: false`, no refetch on focus or reconnect, `staleTime` 5 min. Retries belong to the client only.
 - Offline: the service worker precaches the app shell only. There is no `runtimeCaching`, so Spotify requests go to the network and failures show the offline state.

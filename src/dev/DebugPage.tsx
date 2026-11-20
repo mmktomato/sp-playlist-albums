@@ -6,7 +6,7 @@ import {
   type JSX,
   type ReactNode,
 } from 'react'
-import { logout } from '../auth/auth'
+import { getGrantedScopes, logout } from '../auth/auth'
 import { aggregateAlbums } from '../domain/albums'
 import { isAccessible, toPlaylistSummary } from '../domain/playlists'
 import type { Album } from '../domain/types'
@@ -168,6 +168,7 @@ export default function DebugPage(): JSX.Element {
   const [albums, setAlbums] = useState<Result<AlbumsResult>>(IDLE)
   const [hearts, setHearts] = useState<Result<Heart[]>>(IDLE)
   const [followed, setFollowed] = useState<Result<Set<string>>>(IDLE)
+  const [grantedScopes] = useState(getGrantedScopes)
   const selectionRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -271,6 +272,20 @@ export default function DebugPage(): JSX.Element {
           Logout
         </button>
       </header>
+
+      <Section title="Granted scopes">
+        {grantedScopes.length > 0 ? (
+          <ul className="font-mono text-sm" data-testid="granted-scopes">
+            {grantedScopes.map((scope) => (
+              <li key={scope}>{scope}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm" data-testid="granted-scopes">
+            (none recorded)
+          </p>
+        )}
+      </Section>
 
       <Pending result={initial}>
         {({ me, playlists }) => (

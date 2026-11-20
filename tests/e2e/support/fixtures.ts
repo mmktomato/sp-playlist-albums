@@ -5,6 +5,7 @@ import {
   type StoredPkce,
   type StoredTokens,
 } from '../../../src/auth/tokenStore.ts'
+import { REQUIRED_SCOPES } from './constants.ts'
 import { SpotifyMock } from './spotifyMock.ts'
 
 export { expect }
@@ -49,6 +50,7 @@ function tokensFor(auth: AuthState): StoredTokens | null {
         accessToken: STORED_ACCESS_TOKEN,
         refreshToken: STORED_REFRESH_TOKEN,
         expiresAt: Date.now() + 3600_000,
+        scope: REQUIRED_SCOPES.join(' '),
       }
     case 'expired':
       return {

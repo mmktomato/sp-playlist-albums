@@ -250,7 +250,7 @@ async function refresh(): Promise<string> {
   if (!body) {
     throw new ApiError(response.status, 'Invalid token response')
   }
-  const next = toStoredTokens(body, tokens.refreshToken)
+  const next = toStoredTokens(body, tokens)
   saveTokens(next)
   return next.accessToken
 }
@@ -287,13 +287,29 @@ async function readTokenResponse(
 
 function toStoredTokens(
   body: SpotifyTokenResponse,
-  previousRefreshToken?: string,
+  previous?: StoredTokens,
 ): StoredTokens {
   return {
     accessToken: body.access_token,
-    refreshToken: body.refresh_token ?? previousRefreshToken,
+    refreshToken: body.refresh_token ?? previous?.refreshToken,
     expiresAt: Date.now() + body.expires_in * 1000,
+    scope:
+      typeof body.scope === 'string'
+        ? body.scope
+        : previous
+          ? previous.scope
+          : SPOTIFY_SCOPES.join(' '),
   }
+}
+
+export function getGrantedScopes(): string[] {
+  const scope = loadTokens()?.scope
+  return scope ? scope.split(/\s+/).filter(Boolean) : []
+}
+
+export function hasGrantedScopes(scopes: readonly string[]): boolean {
+  const granted = new Set(getGrantedScopes())
+  return scopes.every((scope) => granted.has(scope))
 }
 
 export function logout(): void {

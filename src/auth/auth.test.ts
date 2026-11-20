@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SPOTIFY_SCOPES } from '../config'
 import { ApiError, AuthError, NetworkError } from '../errors'
 import {
   getAccessToken,
+  getGrantedScopes,
   handleCallback,
+  hasGrantedScopes,
   isLoggedIn,
   login,
   logout,
@@ -11,6 +14,7 @@ import { assignLocation, replaceLocation } from './navigation'
 import { createCodeChallenge } from './pkce'
 import {
   type StoredTokens,
+  TOKENS_KEY,
   loadPkce,
   loadTokens,
   savePkce,
@@ -39,12 +43,16 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
-function tokenResponse(accessToken: string, refreshToken?: string): Response {
+function tokenResponse(
+  accessToken: string,
+  refreshToken?: string,
+  scope: string | null = 'playlist-read-private',
+): Response {
   return jsonResponse({
     access_token: accessToken,
     token_type: 'Bearer',
-    scope: 'playlist-read-private',
     expires_in: 3600,
+    ...(scope !== null ? { scope } : {}),
     ...(refreshToken ? { refresh_token: refreshToken } : {}),
   })
 }
@@ -119,7 +127,7 @@ describe('login', () => {
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('client_id')).toBe('test-client')
     expect(url.searchParams.get('scope')).toBe(
-      'playlist-read-private playlist-read-collaborative user-follow-read user-library-read',
+      'playlist-read-private playlist-read-collaborative user-follow-read user-library-read playlist-modify-public playlist-modify-private',
     )
     expect(url.searchParams.get('redirect_uri')).toBe(
       location.origin + import.meta.env.BASE_URL,
@@ -162,11 +170,25 @@ describe('handleCallback', () => {
     const tokens = loadTokens()
     expect(tokens?.accessToken).toBe('access-new')
     expect(tokens?.refreshToken).toBe('refresh-new')
+    expect(tokens?.scope).toBe('playlist-read-private')
     expect(tokens!.expiresAt).toBeGreaterThan(Date.now() + HOUR_MS - 5000)
     expect(loadPkce()).toBeNull()
     expect(location.search).toBe('?playlist=abc')
     expect(location.hash).toBe('#x')
     expect(isLoggedIn()).toBe(true)
+  })
+
+  it('stores the requested scopes when the exchange omits the scope', async () => {
+    savePkce({ verifier: 'verifier-1', state: 'state-1' })
+    fetchMock.mockResolvedValueOnce(
+      tokenResponse('access-new', 'refresh-new', null),
+    )
+    const url = setUrl('/?code=code-1&state=state-1')
+
+    await expect(handleCallback(url)).resolves.toBe('ok')
+
+    expect(loadTokens()?.scope).toBe(SPOTIFY_SCOPES.join(' '))
+    expect(hasGrantedScopes(SPOTIFY_SCOPES)).toBe(true)
   })
 
   it('rejects a state mismatch without exchanging the code', async () => {
@@ -273,6 +295,29 @@ describe('getAccessToken', () => {
     expect(loadTokens()).toMatchObject({
       accessToken: 'access-2',
       refreshToken: 'refresh-1',
+    })
+  })
+
+  it('saves the scope returned by a refresh', async () => {
+    storeTokens({ expiresAt: Date.now() - 1000, scope: 'old-scope' })
+    fetchMock.mockResolvedValueOnce(
+      tokenResponse('access-2', undefined, 'scope-a scope-b'),
+    )
+
+    await getAccessToken()
+
+    expect(loadTokens()?.scope).toBe('scope-a scope-b')
+  })
+
+  it('keeps the previous scope when a refresh omits it', async () => {
+    storeTokens({ expiresAt: Date.now() - 1000, scope: 'scope-a scope-b' })
+    fetchMock.mockResolvedValueOnce(tokenResponse('access-2', undefined, null))
+
+    await getAccessToken()
+
+    expect(loadTokens()).toMatchObject({
+      accessToken: 'access-2',
+      scope: 'scope-a scope-b',
     })
   })
 
@@ -421,6 +466,51 @@ describe('getAccessToken', () => {
 
     await expect(getAccessToken()).rejects.toBeInstanceOf(NetworkError)
     await expect(getAccessToken()).resolves.toBe('access-2')
+  })
+})
+
+describe('getGrantedScopes and hasGrantedScopes', () => {
+  it('returns no scopes when logged out', () => {
+    expect(getGrantedScopes()).toEqual([])
+    expect(hasGrantedScopes(['playlist-modify-public'])).toBe(false)
+  })
+
+  it('returns no scopes for tokens saved without a scope', () => {
+    storeTokens()
+    expect(getGrantedScopes()).toEqual([])
+    expect(hasGrantedScopes(['playlist-modify-public'])).toBe(false)
+    expect(hasGrantedScopes([])).toBe(true)
+  })
+
+  it('ignores a stored scope that is not a string', () => {
+    localStorage.setItem(
+      TOKENS_KEY,
+      JSON.stringify({ accessToken: 'a', expiresAt: Date.now(), scope: 1 }),
+    )
+    expect(loadTokens()?.scope).toBeUndefined()
+    expect(getGrantedScopes()).toEqual([])
+  })
+
+  it('splits the stored scope and checks that all requested scopes are granted', () => {
+    storeTokens({
+      scope:
+        'playlist-read-private  playlist-modify-public playlist-modify-private',
+    })
+    expect(getGrantedScopes()).toEqual([
+      'playlist-read-private',
+      'playlist-modify-public',
+      'playlist-modify-private',
+    ])
+    expect(
+      hasGrantedScopes(['playlist-modify-public', 'playlist-modify-private']),
+    ).toBe(true)
+  })
+
+  it('reports missing scopes', () => {
+    storeTokens({ scope: 'playlist-read-private playlist-modify-public' })
+    expect(
+      hasGrantedScopes(['playlist-modify-public', 'playlist-modify-private']),
+    ).toBe(false)
   })
 })
 

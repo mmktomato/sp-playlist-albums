@@ -1,11 +1,17 @@
 export const SPOTIFY_CLIENT_ID: string =
   import.meta.env.VITE_SPOTIFY_CLIENT_ID ?? ''
 
+export const MODIFY_SCOPES = [
+  'playlist-modify-public',
+  'playlist-modify-private',
+] as const
+
 export const SPOTIFY_SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
   'user-follow-read',
   'user-library-read',
+  ...MODIFY_SCOPES,
 ] as const
 
 export const SPOTIFY_AUTHORIZE_URL = 'https://accounts.spotify.com/authorize'
