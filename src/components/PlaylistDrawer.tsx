@@ -1,9 +1,7 @@
-import { useEffect, useId, useRef, type RefObject } from 'react'
+import { useId, useRef, type RefObject } from 'react'
 import { isAccessible } from '../domain/playlists'
 import type { PlaylistSummary } from '../domain/types'
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+import { useModalFocus } from '../hooks/useModalFocus'
 
 export type DrawerStatus = 'loading' | 'error' | 'ready'
 
@@ -35,56 +33,7 @@ export function PlaylistDrawer({
   onLogout,
 }: PlaylistDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  useEffect(() => {
-    if (!open) return
-    const panel = panelRef.current
-    const returnTarget = returnFocusRef.current
-    if (!panel) return
-
-    const focusables = () =>
-      Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    ;(focusables()[0] ?? panel).focus()
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== 'Tab') return
-      const items = focusables()
-      if (items.length === 0) {
-        event.preventDefault()
-        panel.focus()
-        return
-      }
-      const first = items[0]
-      const last = items[items.length - 1]
-      const active = document.activeElement
-      if (!panel.contains(active)) {
-        event.preventDefault()
-        first.focus()
-      } else if (event.shiftKey && (active === first || active === panel)) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      returnTarget?.focus()
-    }
-  }, [open, returnFocusRef])
+  useModalFocus({ open, containerRef: panelRef, onClose, returnFocusRef })
 
   return (
     <div id={id} hidden={!open} className="fixed inset-0 z-40">
