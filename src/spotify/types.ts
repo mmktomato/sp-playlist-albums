@@ -123,6 +123,10 @@ export type SpotifyFollowedArtistsResponse = {
 
 export type SpotifyLibraryContainsResponse = boolean[]
 
+export type SpotifyRemoveItemsResponse = {
+  snapshot_id: string
+}
+
 export type SpotifyErrorBody = {
   error: {
     status: number

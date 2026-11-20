@@ -42,6 +42,20 @@ export class NetworkError extends Error {
   }
 }
 
+export class PartialRemovalError extends Error {
+  readonly succeededChunks: number
+
+  constructor(
+    succeededChunks: number,
+    message = `Removal stopped after ${succeededChunks} chunk(s)`,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
+    this.name = 'PartialRemovalError'
+    this.succeededChunks = succeededChunks
+  }
+}
+
 export class ApiError extends Error {
   readonly status: number
 

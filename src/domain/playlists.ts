@@ -32,6 +32,10 @@ export function isAccessible(
   return summary.ownerId === meId || summary.collaborative
 }
 
+export function canModify(summary: PlaylistSummary, meId: string): boolean {
+  return summary.ownerId === meId || summary.collaborative
+}
+
 export type ClassifiedPlaylists = {
   owned: PlaylistSummary[]
   saved: PlaylistSummary[]

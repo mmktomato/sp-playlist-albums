@@ -1,4 +1,4 @@
-import { ApiError } from '../errors'
+import { ApiError, AuthError, PartialRemovalError } from '../errors'
 import { spotifyFetch, type QueryValue } from './client'
 import {
   fetchAllCursorPages,
@@ -12,14 +12,16 @@ import type {
   SpotifyMe,
   SpotifyPlaylistItem,
   SpotifyPlaylistItemContent,
+  SpotifyRemoveItemsResponse,
   SpotifySimplifiedPlaylist,
 } from './types'
 
 export const PAGE_LIMIT = 50
 export const LIBRARY_CONTAINS_CHUNK_SIZE = 40
+export const REMOVE_ITEMS_CHUNK_SIZE = 100
 
 const CONTENT_FIELDS =
-  'type,album(id,name,uri,images,artists(id,name),total_tracks)'
+  'type,uri,album(id,name,uri,images,artists(id,name),total_tracks)'
 export const PLAYLIST_ITEMS_FIELDS = `items(is_local,item(${CONTENT_FIELDS}),track(${CONTENT_FIELDS})),next,total`
 
 export function entryTrack(
@@ -80,6 +82,31 @@ export function getPlaylistItemsFirstPageRaw(
     signal,
     query: playlistItemsQuery(fields),
   })
+}
+
+export async function removePlaylistItems(
+  playlistId: string,
+  uris: readonly string[],
+): Promise<void> {
+  if (!playlistId) throw new Error('playlistId is required')
+  if (uris.length === 0) throw new Error('uris must not be empty')
+
+  const chunks: string[][] = []
+  for (let i = 0; i < uris.length; i += REMOVE_ITEMS_CHUNK_SIZE) {
+    chunks.push(uris.slice(i, i + REMOVE_ITEMS_CHUNK_SIZE))
+  }
+  for (const [index, chunk] of chunks.entries()) {
+    try {
+      // No AbortSignal: a sent removal cannot be undone, so aborting gains nothing.
+      await spotifyFetch<SpotifyRemoveItemsResponse>(
+        playlistItemsPath(playlistId),
+        { method: 'DELETE', body: { items: chunk.map((uri) => ({ uri })) } },
+      )
+    } catch (error) {
+      if (index === 0 || error instanceof AuthError) throw error
+      throw new PartialRemovalError(index, undefined, { cause: error })
+    }
+  }
 }
 
 export async function getFollowedArtistIds(

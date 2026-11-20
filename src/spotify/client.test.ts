@@ -81,6 +81,69 @@ describe('spotifyFetch', () => {
     expect(url.searchParams.get('fields')).toBe('next')
   })
 
+  it('sends GET without a body by default', async () => {
+    fetchMock.mockResolvedValueOnce(json({}))
+    await spotifyFetch('/me')
+    const init = fetchMock.mock.calls[0][1]
+    expect(init?.method).toBe('GET')
+    expect(init?.body).toBeUndefined()
+    expect(init?.headers).not.toHaveProperty('Content-Type')
+  })
+
+  it('sends DELETE with a JSON body', async () => {
+    fetchMock.mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+    const body = { items: [{ uri: 'spotify:track:1' }] }
+    await expect(
+      spotifyFetch('/playlists/p/items', { method: 'DELETE', body }),
+    ).resolves.toEqual({ snapshot_id: 's1' })
+    const init = fetchMock.mock.calls[0][1]
+    expect(init?.method).toBe('DELETE')
+    expect(init?.body).toBe(JSON.stringify(body))
+    expect(init?.headers).toMatchObject({
+      Authorization: 'Bearer token-1',
+      'Content-Type': 'application/json',
+    })
+  })
+
+  it('keeps the method and body when retrying a 401', async () => {
+    getAccessTokenMock
+      .mockResolvedValueOnce('old-token')
+      .mockResolvedValueOnce('new-token')
+    fetchMock
+      .mockResolvedValueOnce(json(errorBody(401), 401))
+      .mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+    const body = { items: [{ uri: 'spotify:track:1' }] }
+    await spotifyFetch('/playlists/p/items', { method: 'DELETE', body })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    for (const call of [0, 1]) {
+      const init = fetchMock.mock.calls[call][1]
+      expect(init?.method).toBe('DELETE')
+      expect(init?.body).toBe(JSON.stringify(body))
+      expect(init?.headers).toMatchObject({
+        'Content-Type': 'application/json',
+      })
+    }
+    expect(authHeader(1)).toBe('Bearer new-token')
+  })
+
+  it('keeps the method and body when retrying a 429', async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockResolvedValueOnce(json(errorBody(429), 429, { 'Retry-After': '1' }))
+      .mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+    const body = { items: [{ uri: 'spotify:track:1' }] }
+    const promise = spotifyFetch('/playlists/p/items', {
+      method: 'DELETE',
+      body,
+    })
+    await vi.advanceTimersByTimeAsync(1000)
+    await promise
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const init = fetchMock.mock.calls[1][1]
+    expect(init?.method).toBe('DELETE')
+    expect(init?.body).toBe(JSON.stringify(body))
+  })
+
   it('refuses absolute URLs outside the Spotify API', async () => {
     await expect(spotifyFetch('https://example.com/v1/me')).rejects.toThrow()
     expect(fetchMock).not.toHaveBeenCalled()

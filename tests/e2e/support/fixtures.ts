@@ -10,7 +10,7 @@ import { SpotifyMock } from './spotifyMock.ts'
 
 export { expect }
 
-export type AuthState = 'valid' | 'expired' | 'none'
+export type AuthState = 'valid' | 'valid-legacy' | 'expired' | 'none'
 
 export const STORED_ACCESS_TOKEN = 'stored-access'
 export const EXPIRED_ACCESS_TOKEN = 'expired-access'
@@ -51,6 +51,12 @@ function tokensFor(auth: AuthState): StoredTokens | null {
         refreshToken: STORED_REFRESH_TOKEN,
         expiresAt: Date.now() + 3600_000,
         scope: REQUIRED_SCOPES.join(' '),
+      }
+    case 'valid-legacy':
+      return {
+        accessToken: STORED_ACCESS_TOKEN,
+        refreshToken: STORED_REFRESH_TOKEN,
+        expiresAt: Date.now() + 3600_000,
       }
     case 'expired':
       return {

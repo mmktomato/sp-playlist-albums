@@ -18,6 +18,14 @@ export type QueryValue = string | number | boolean | null | undefined
 export type SpotifyFetchOptions = {
   signal?: AbortSignal
   query?: Record<string, QueryValue>
+  method?: 'GET' | 'DELETE'
+  body?: unknown
+}
+
+type SendInit = {
+  method: 'GET' | 'DELETE'
+  body?: string
+  signal?: AbortSignal
 }
 
 type RawResponse = {
@@ -106,14 +114,13 @@ function isMeEndpoint(url: URL): boolean {
 async function send(
   url: URL,
   token: string,
-  signal?: AbortSignal,
+  { method, body, signal }: SendInit,
 ): Promise<RawResponse> {
   await acquireSlot(signal)
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal,
-    })
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    const res = await fetch(url, { method, headers, body, signal })
     const text = await res.text()
     return { status: res.status, ok: res.ok, headers: res.headers, text }
   } catch (error) {
@@ -154,15 +161,17 @@ export async function spotifyFetch<T>(
   path: string,
   options: SpotifyFetchOptions = {},
 ): Promise<T> {
-  const { signal, query } = options
+  const { signal, query, method = 'GET' } = options
   const url = buildUrl(path, query)
+  const body =
+    options.body === undefined ? undefined : JSON.stringify(options.body)
   let token = await getAccessToken()
   let tokenRetried = false
   let rateLimitRetries = 0
 
   for (;;) {
     signal?.throwIfAborted()
-    const res = await send(url, token, signal)
+    const res = await send(url, token, { method, body, signal })
 
     if (res.ok) {
       try {

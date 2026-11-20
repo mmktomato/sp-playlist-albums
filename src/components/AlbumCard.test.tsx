@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { Album } from '../domain/types'
 import { AlbumCard } from './AlbumCard'
 
@@ -14,6 +14,8 @@ const album: Album = {
     { id: 'a2', name: 'Artist B' },
   ],
   trackCount: 1,
+  trackUris: ['spotify:track:t1'],
+  removable: true,
 }
 
 describe('AlbumCard', () => {
@@ -88,5 +90,54 @@ describe('AlbumCard', () => {
   it('omits the track count line when the total is missing', () => {
     render(<AlbumCard album={album} saved="saved" />)
     expect(screen.queryByText(/\btracks?\b/)).not.toBeInTheDocument()
+  })
+
+  it('has no actions button unless requested', () => {
+    render(<AlbumCard album={album} saved="saved" />)
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('opens the actions for the album from a button next to the link', () => {
+    const onOpenActions = vi.fn()
+    render(
+      <AlbumCard
+        album={album}
+        saved="saved"
+        showActions
+        onOpenActions={onOpenActions}
+      />,
+    )
+    const button = screen.getByRole('button', {
+      name: 'More actions for Album One',
+    })
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(button).toBeEnabled()
+    expect(screen.getByRole('link')).not.toContainElement(button)
+    expect(
+      within(screen.getByRole('link')).queryByRole('button'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(button)
+
+    expect(onOpenActions).toHaveBeenCalledWith(album)
+  })
+
+  it('disables the actions button', () => {
+    const onOpenActions = vi.fn()
+    render(
+      <AlbumCard
+        album={album}
+        saved="saved"
+        showActions
+        actionsDisabled
+        onOpenActions={onOpenActions}
+      />,
+    )
+    const button = screen.getByRole('button', {
+      name: 'More actions for Album One',
+    })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(onOpenActions).not.toHaveBeenCalled()
   })
 })

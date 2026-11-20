@@ -1,14 +1,27 @@
-import { useQuery, type QueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { useState } from 'react'
 import { aggregateAlbums } from '../domain/albums'
 import { classifyPlaylists } from '../domain/playlists'
 import type { Album } from '../domain/types'
+import {
+  ApiError,
+  AuthError,
+  ForbiddenError,
+  PartialRemovalError,
+  QuotaExceededError,
+} from '../errors'
 import {
   checkLibraryContains,
   getFollowedArtistIds,
   getMe,
   getMyPlaylists,
   getPlaylistItems,
+  removePlaylistItems,
 } from '../spotify/endpoints'
 
 export const queryKeys = {
@@ -92,6 +105,52 @@ export function useFollowedArtists(enabled: boolean) {
     enabled,
     staleTime: Infinity,
     gcTime: Infinity,
+  })
+}
+
+export type RemoveAlbumVariables = {
+  playlistId: string
+  albumId: string
+  uris: readonly string[]
+}
+
+export function isNothingRemoved(error: unknown): boolean {
+  if (error instanceof PartialRemovalError) return false
+  if (
+    error instanceof ForbiddenError ||
+    error instanceof QuotaExceededError ||
+    error instanceof AuthError
+  ) {
+    return true
+  }
+  return error instanceof ApiError && error.status >= 400 && error.status <= 499
+}
+
+export function useRemoveAlbumFromPlaylist() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ playlistId, uris }: RemoveAlbumVariables) =>
+      removePlaylistItems(playlistId, uris),
+    onMutate: async ({ playlistId }) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.playlistAlbums(playlistId),
+      })
+    },
+    onSuccess: async (_data, { playlistId, albumId }) => {
+      const queryKey = queryKeys.playlistAlbums(playlistId)
+      await queryClient.cancelQueries({ queryKey })
+      queryClient.setQueryData<Album[]>(
+        queryKey,
+        (albums) => albums?.filter((album) => album.id !== albumId),
+        { updatedAt: queryClient.getQueryState(queryKey)?.dataUpdatedAt },
+      )
+    },
+    onError: (error, { playlistId }) => {
+      if (isNothingRemoved(error)) return
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.playlistAlbums(playlistId),
+      })
+    },
   })
 }
 

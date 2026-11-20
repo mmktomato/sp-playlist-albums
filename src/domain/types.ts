@@ -12,6 +12,8 @@ export type Album = {
   artists: AlbumArtist[]
   trackCount: number
   totalTracks?: number
+  trackUris: string[]
+  removable: boolean
 }
 
 export type PlaylistSummary = {

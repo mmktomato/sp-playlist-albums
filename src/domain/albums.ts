@@ -5,6 +5,8 @@ import type {
 import { pickImageUrl } from './images'
 import type { Album, AlbumArtist } from './types'
 
+const TRACK_URI_PATTERN = /^spotify:track:[A-Za-z0-9]+$/
+
 function toTotalTracks(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
@@ -33,21 +35,30 @@ export function aggregateAlbums(
     const id = album?.id
     if (!album || !id) continue
 
-    const existing = albums.get(id)
-    if (existing) {
-      existing.trackCount += 1
-      continue
+    let target = albums.get(id)
+    if (target) {
+      target.trackCount += 1
+    } else {
+      target = {
+        id,
+        name: album.name,
+        uri: album.uri ?? `spotify:album:${id}`,
+        url: albumUrl(id),
+        imageUrl: pickImageUrl(album.images),
+        artists: toAlbumArtists(album),
+        trackCount: 1,
+        totalTracks: toTotalTracks(album.total_tracks),
+        trackUris: [],
+        removable: true,
+      }
+      albums.set(id, target)
     }
-    albums.set(id, {
-      id,
-      name: album.name,
-      uri: album.uri ?? `spotify:album:${id}`,
-      url: albumUrl(id),
-      imageUrl: pickImageUrl(album.images),
-      artists: toAlbumArtists(album),
-      trackCount: 1,
-      totalTracks: toTotalTracks(album.total_tracks),
-    })
+    const uri = content.uri
+    if (typeof uri === 'string' && TRACK_URI_PATTERN.test(uri)) {
+      if (!target.trackUris.includes(uri)) target.trackUris.push(uri)
+    } else {
+      target.removable = false
+    }
   }
   return [...albums.values()]
 }

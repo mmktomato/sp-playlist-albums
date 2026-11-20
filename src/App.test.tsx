@@ -115,6 +115,10 @@ function renderApp(search = '') {
   return render(<App callbackResult="none" />)
 }
 
+async function findMainAlert(): Promise<HTMLElement> {
+  return within(await screen.findByRole('main')).findByRole('alert')
+}
+
 function menuButton(): HTMLElement {
   return screen.getByRole('button', { name: 'Menu' })
 }
@@ -398,7 +402,7 @@ describe('album list', () => {
 
   it('does not fetch a playlist restricted by Spotify', async () => {
     renderApp('?playlist=others')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await findMainAlert()).toHaveTextContent(
       'Unavailable due to Spotify restrictions',
     )
     expect(getPlaylistItems).not.toHaveBeenCalled()
@@ -409,7 +413,7 @@ describe('error states', () => {
   it('shows the not-allowed message when /me is forbidden', async () => {
     vi.mocked(getMe).mockRejectedValue(new ForbiddenError('user'))
     renderApp()
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent("This account isn't allowed to use the app")
     expect(
       within(alert).getByRole('button', { name: 'Log out' }),
@@ -421,7 +425,7 @@ describe('error states', () => {
       new ForbiddenError('resource'),
     )
     renderApp('?playlist=mine')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await findMainAlert()).toHaveTextContent(
       "Can't load due to Spotify restrictions",
     )
   })
@@ -429,7 +433,7 @@ describe('error states', () => {
   it('shows not found when ?playlist= is unknown', async () => {
     vi.mocked(getPlaylistItems).mockRejectedValue(new ApiError(404))
     renderApp('?playlist=unknown')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent('Playlist not found')
     expect(alert).toHaveTextContent('404')
     expect(getPlaylistItems).toHaveBeenCalledWith('unknown', expect.anything())
@@ -438,7 +442,7 @@ describe('error states', () => {
   it('does not report a missing playlist when another request returns 404', async () => {
     vi.mocked(getMe).mockRejectedValue(new ApiError(404))
     renderApp('?playlist=mine')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent("Couldn't load data from Spotify")
     expect(alert).not.toHaveTextContent('Playlist not found')
     expect(
@@ -455,7 +459,7 @@ describe('error states', () => {
   it('shows a generic error with the status code', async () => {
     vi.mocked(getPlaylistItems).mockRejectedValue(new ApiError(502))
     renderApp('?playlist=mine')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent("Couldn't load data from Spotify")
     expect(alert).toHaveTextContent('502')
     expect(
@@ -466,7 +470,7 @@ describe('error states', () => {
   it('asks to wait when the quota is exceeded', async () => {
     vi.mocked(getPlaylistItems).mockRejectedValue(new QuotaExceededError())
     renderApp('?playlist=mine')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent('Please wait a while and try again')
     expect(
       within(alert).getByRole('button', { name: 'Retry' }),
@@ -476,7 +480,7 @@ describe('error states', () => {
   it('shows the offline message on a network error and retries', async () => {
     vi.mocked(getPlaylistItems).mockRejectedValueOnce(new NetworkError())
     renderApp('?playlist=mine')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent(OFFLINE_TEXT)
     expect(logout).not.toHaveBeenCalled()
 
@@ -489,7 +493,7 @@ describe('error states', () => {
   it('shows the offline message when the browser is offline', async () => {
     setOnline(false)
     renderApp('?playlist=mine')
-    const alert = await screen.findByRole('alert')
+    const alert = await findMainAlert()
     expect(alert).toHaveTextContent(OFFLINE_TEXT)
     expect(
       within(alert).getByRole('button', { name: 'Retry' }),
@@ -505,7 +509,7 @@ describe('error states', () => {
   it('shows the offline message when the playlist list fails', async () => {
     vi.mocked(getMyPlaylists).mockRejectedValue(new NetworkError())
     renderApp()
-    expect(await screen.findByRole('alert')).toHaveTextContent(OFFLINE_TEXT)
+    expect(await findMainAlert()).toHaveTextContent(OFFLINE_TEXT)
   })
 
   it('logs out on an authentication error', async () => {

@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccessToken } from '../auth/auth'
 import {
+  ApiError,
+  AuthError,
+  ForbiddenError,
+  PartialRemovalError,
+} from '../errors'
+import {
   PLAYLIST_ITEMS_FIELDS,
+  REMOVE_ITEMS_CHUNK_SIZE,
   checkLibraryContains,
   entryTrack,
   getFollowedArtistIds,
@@ -9,6 +16,7 @@ import {
   getMyPlaylists,
   getPlaylistItems,
   getPlaylistItemsFirstPageRaw,
+  removePlaylistItems,
 } from './endpoints'
 import type { SpotifyPlaylistItem, SpotifyTrack } from './types'
 
@@ -99,7 +107,7 @@ describe('getPlaylistItems', () => {
 
   it('uses the planned fields expression', () => {
     expect(PLAYLIST_ITEMS_FIELDS).toBe(
-      'items(is_local,item(type,album(id,name,uri,images,artists(id,name),total_tracks)),track(type,album(id,name,uri,images,artists(id,name),total_tracks))),next,total',
+      'items(is_local,item(type,uri,album(id,name,uri,images,artists(id,name),total_tracks)),track(type,uri,album(id,name,uri,images,artists(id,name),total_tracks))),next,total',
     )
   })
 
@@ -200,6 +208,116 @@ describe('checkLibraryContains', () => {
   it('skips the request for an empty list', async () => {
     await expect(checkLibraryContains([])).resolves.toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('removePlaylistItems', () => {
+  function trackUris(count: number): string[] {
+    return Array.from({ length: count }, (_, i) => `spotify:track:t${i}`)
+  }
+
+  function sentUris(call: number): string[] {
+    const body = JSON.parse(String(fetchMock.mock.calls[call][1]?.body)) as {
+      items: { uri: string }[]
+    }
+    return body.items.map((item) => item.uri)
+  }
+
+  it('sends one DELETE with the items body to the encoded playlist path', async () => {
+    fetchMock.mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+    const uris = ['spotify:track:a', 'spotify:track:b']
+
+    await expect(removePlaylistItems('p 1', uris)).resolves.toBeUndefined()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = requestedUrl(0)
+    expect(url.pathname).toBe('/v1/playlists/p%201/items')
+    expect(url.search).toBe('')
+    const init = fetchMock.mock.calls[0][1]
+    expect(init?.method).toBe('DELETE')
+    expect(init?.signal).toBeUndefined()
+    expect(JSON.parse(String(init?.body))).toEqual({
+      items: [{ uri: 'spotify:track:a' }, { uri: 'spotify:track:b' }],
+    })
+  })
+
+  it('splits into chunks of 100 and sends them one at a time', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    fetchMock.mockImplementation(async () => {
+      inFlight++
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      inFlight--
+      return json({ snapshot_id: 's' })
+    })
+    const uris = trackUris(250)
+
+    await removePlaylistItems('p', uris)
+
+    expect(REMOVE_ITEMS_CHUNK_SIZE).toBe(100)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(maxInFlight).toBe(1)
+    expect(sentUris(0)).toEqual(uris.slice(0, 100))
+    expect(sentUris(1)).toEqual(uris.slice(100, 200))
+    expect(sentUris(2)).toEqual(uris.slice(200))
+    for (const call of [0, 1, 2]) {
+      expect(requestedUrl(call).pathname).toBe('/v1/playlists/p/items')
+    }
+  })
+
+  it('throws without a request for empty input', async () => {
+    await expect(removePlaylistItems('p', [])).rejects.toThrow()
+    await expect(removePlaylistItems('', ['spotify:track:a'])).rejects.toThrow()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rethrows a failure of the first chunk as-is', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { status: 403, message: 'no' } }), {
+        status: 403,
+      }),
+    )
+
+    const error = await removePlaylistItems('p', trackUris(150)).catch(
+      (e: unknown) => e,
+    )
+
+    expect(error).toBeInstanceOf(ForbiddenError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('throws PartialRemovalError when a later chunk fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+      .mockResolvedValueOnce(json({ snapshot_id: 's2' }))
+      .mockResolvedValueOnce(new Response('oops', { status: 502 }))
+
+    const error = await removePlaylistItems('p', trackUris(350)).catch(
+      (e: unknown) => e,
+    )
+
+    expect(error).toBeInstanceOf(PartialRemovalError)
+    expect((error as PartialRemovalError).succeededChunks).toBe(2)
+    const cause = (error as PartialRemovalError).cause
+    expect(cause).toBeInstanceOf(ApiError)
+    expect((cause as ApiError).status).toBe(502)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not wrap an AuthError from a later chunk', async () => {
+    const authError = new AuthError('Refresh token is no longer valid')
+    vi.mocked(getAccessToken)
+      .mockResolvedValueOnce('token')
+      .mockRejectedValueOnce(authError)
+    fetchMock.mockResolvedValueOnce(json({ snapshot_id: 's1' }))
+
+    const error = await removePlaylistItems('p', trackUris(150)).catch(
+      (e: unknown) => e,
+    )
+
+    expect(error).toBe(authError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 

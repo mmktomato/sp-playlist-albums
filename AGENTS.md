@@ -35,11 +35,11 @@ src/
   main.tsx             Handles the OAuth callback once before render, registers the SW, renders <App callbackResult>
   App.tsx              Login screen / main screen / ?debug page switch, QueryClient
   config.ts            Client ID, redirect URI (location.origin + BASE_URL), scopes, Spotify URLs
-  errors.ts            AuthError, ForbiddenError(scope), QuotaExceededError, NetworkError, ApiError
+  errors.ts            AuthError, ForbiddenError(scope), QuotaExceededError, NetworkError, PartialRemovalError, ApiError
   auth/                PKCE, token storage (localStorage), refresh
   spotify/             fetch client, paging, endpoints, API types
   domain/              Pure logic: album aggregation, follow filter, playlist classification
-  hooks/               TanStack Query hooks and small UI hooks
+  hooks/               TanStack Query hooks, useModalFocus (shared by the drawer and the album sheet), small UI hooks
   components/          UI; components/states/ holds login, loading and error states
   dev/DebugPage.tsx    ?debug=1 page for checking real API responses
 tests/e2e/             Functional E2E with a mocked Spotify API (projects e2e-*)
@@ -54,6 +54,7 @@ Layering: `components`/`hooks` → `spotify` + `domain` → `errors`/`config`. `
 These shape the design. Check the [migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide) before changing API calls.
 
 - Playlist tracks: `GET /playlists/{id}/items` (`/tracks` was removed). Entries carry the track in `item`; the deprecated `track` key may also appear, so read `item ?? track`. `limit` max 50. Returns 403 unless the user owns or collaborates on the playlist.
+- Remove tracks: `DELETE /playlists/{id}/items` with body `{ "items": [{ "uri": "..." }] }`, up to 100 URIs per call. It removes every occurrence of each URI in that playlist; there is no positional removal. Needs `playlist-modify-public` and `playlist-modify-private`.
 - Saved check: `GET /me/library/contains?uris=...` with up to 40 URIs. The per-type `contains` endpoints were removed.
 - Followed artists: `GET /me/following?type=artist` (cursor paging, limit 50).
 - Batch endpoints (`GET /albums?ids=`) and `GET /users/{id}/playlists` were removed. Albums come from `item.album` in playlist items.
@@ -61,7 +62,7 @@ These shape the design. Check the [migration guide](https://developer.spotify.co
 - Quota is per developer account; exhaustion returns 429 with `reason: QUOTA_EXCEEDED`.
 - Redirect URIs cannot use `localhost`; use `127.0.0.1`.
 
-Whether a playlist is selectable is decided only by `isAccessible` in `src/domain/playlists.ts`. `ACCESSIBILITY_METHOD` switches between `'owner-or-collaborative'` (current) and `'items-field'`. Use the `?debug=1` page to verify real responses before switching.
+Whether a playlist is selectable is decided only by `isAccessible` in `src/domain/playlists.ts`. `ACCESSIBILITY_METHOD` switches between `'owner-or-collaborative'` (current) and `'items-field'`. Use the `?debug=1` page to verify real responses before switching. Whether removal is offered is decided separately by `canModify` (owner or collaborative).
 
 ## Design rules
 
@@ -71,8 +72,14 @@ Whether a playlist is selectable is decided only by `isAccessible` in `src/domai
   - Clear tokens only on `invalid_grant`. Network errors and 5xx must not log the user out.
   - Logout and `AuthError` reload the page (`location.replace(BASE_URL)`). There is no auth-state event system.
   - The granted `scope` is stored with the tokens (kept from the previous token when a refresh omits it). Tokens issued before a scope was added lack it, so check `hasGrantedScopes` first and ask the user to log in again. `?debug=1` shows the granted scopes.
-- API client: max 4 concurrent requests. Retry a 401 once with a fresh token. Retry a 429 only when `Retry-After` is at most 10 s, at most twice. Pass `AbortSignal` everywhere, and never turn `AbortError` into `NetworkError`.
-- TanStack Query: `networkMode: 'always'`, `retry: false`, no refetch on focus or reconnect, `staleTime` 5 min. Retries belong to the client only.
+- API client: max 4 concurrent requests. Retry a 401 once with a fresh token. Retry a 429 only when `Retry-After` is at most 10 s, at most twice. Pass `AbortSignal` everywhere except `DELETE` (a sent removal can't be undone), and never turn `AbortError` into `NetworkError`.
+- TanStack Query: queries and mutations use `networkMode: 'always'` and `retry: false`. No refetch on focus or reconnect, `staleTime` 5 min. Retries belong to the client only.
+- Removing an album from a playlist
+  - Use only the `playlistId` snapshotted when the sheet opened and the `trackUris` aggregated from that playlist's items. Never re-read the selected playlist at confirm time.
+  - No removal while the album list is fetching. The mutation cancels that playlist's album query before the `DELETE` and again before writing the cache, so a stale refetch can't bring the album back.
+  - Reset the sheet and banner state when the selected playlist changes (during render, not in an effect), so they never reappear on another playlist.
+  - On success, `setQueryData` keeps the previous `updatedAt`. `savedAlbums` is keyed by `dataUpdatedAt`, so this avoids refetching library state.
+  - On failure, refetch the album list unless nothing can have been removed (`ForbiddenError`, `QuotaExceededError`, `AuthError`, or a 4xx `ApiError`). A failure after the first chunk is wrapped in `PartialRemovalError`, except `AuthError`.
 - Offline: the service worker precaches the app shell only. There is no `runtimeCaching`, so Spotify requests go to the network and failures show the offline state.
 - CSP: injected into `index.html` only in production builds (`vite.config.ts`). Don't use inline scripts, `style` props, or `dangerouslySetInnerHTML`. New image or API hosts must be added to the CSP.
 - Album links are plain `<a href="https://open.spotify.com/album/{id}">` so universal links open the Spotify app.
@@ -86,6 +93,8 @@ Whether a playlist is selectable is decided only by `isAccessible` in `src/domai
 - E2E uses `serviceWorkers: 'block'` because `page.route` cannot see requests handled by a service worker. PWA behavior is covered in `tests/pwa/`.
 - Seed login state with `storageState`, not `addInitScript`. Open pages with relative paths (`page.goto('./')`), because `baseURL` includes the base path.
 - The E2E fixtures fail a test on console errors and CSP violations. Allow expected errors explicitly.
+- The E2E Spotify mock ignores `fields` and returns every field. The `fields` string is covered only by `endpoints.test.ts` and the `?debug=1` page.
+- The mock's `intercept`, `respond` and `requestsTo` take an HTTP method, defaulting to `GET`, so a `DELETE` is not counted as a read of the same path.
 - Browsers are installed under `node_modules` (`PLAYWRIGHT_BROWSERS_PATH=0` in the npm scripts).
 
 ## Conventions

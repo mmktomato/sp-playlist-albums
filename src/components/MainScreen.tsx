@@ -1,21 +1,28 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { logout } from '../auth/auth'
 import { filterByFollowedAlbumArtists } from '../domain/filter'
-import { isAccessible } from '../domain/playlists'
+import { canModify, isAccessible } from '../domain/playlists'
 import type { Album } from '../domain/types'
+import { ForbiddenError, PartialRemovalError } from '../errors'
 import {
+  isNothingRemoved,
+  queryKeys,
   reloadSpotifyData,
   useFollowedArtists,
   useMe,
   usePlaylistAlbums,
   usePlaylists,
+  useRemoveAlbumFromPlaylist,
   useSavedAlbums,
 } from '../hooks/spotifyQueries'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useSelectedPlaylistId } from '../hooks/useSelectedPlaylistId'
+import { AlbumActionSheet } from './AlbumActionSheet'
 import type { SavedState } from './AlbumCard'
 import { AlbumList } from './AlbumList'
+import { Banner } from './Banner'
+import { formatTracks } from './formatTracks'
 import { Header } from './Header'
 import { PlaylistDrawer, type DrawerStatus } from './PlaylistDrawer'
 import { OFFLINE_MESSAGE, describeError } from './states/describeError'
@@ -25,14 +32,52 @@ import { ActionButton, StatusMessage } from './states/StatusMessage'
 
 const APP_TITLE = 'Playlist Albums for Spotify'
 
+type SheetState = {
+  playlistId: string
+  playlistName: string
+  album: Album
+}
+
+type BannerState = {
+  playlistId: string
+  role: 'status' | 'alert'
+  message: string
+}
+
+function removalErrorMessage(error: unknown): string {
+  if (error instanceof ForbiddenError) return "You can't edit this playlist"
+  if (error instanceof PartialRemovalError) {
+    return `Only some tracks were removed (${describeError(error.cause).title})`
+  }
+  if (!isNothingRemoved(error)) {
+    return `The removal may not have completed (${describeError(error).title})`
+  }
+  return `Couldn't remove the album (${describeError(error).title})`
+}
+
 export function MainScreen() {
   const queryClient = useQueryClient()
   const online = useOnlineStatus()
   const drawerId = useId()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [followOnly, setFollowOnly] = useState(false)
   const [selectedId, selectPlaylist] = useSelectedPlaylistId()
+  const [sheet, setSheet] = useState<SheetState | null>(null)
+  const [banner, setBanner] = useState<BannerState | null>(null)
+  const [prevSelectedId, setPrevSelectedId] = useState(selectedId)
+  if (prevSelectedId !== selectedId) {
+    setPrevSelectedId(selectedId)
+    setSheet(null)
+    setBanner(null)
+  }
+  const sheetRef = useRef(sheet)
+  useEffect(() => {
+    sheetRef.current = sheet
+  }, [sheet])
+  const removeMutation = useRemoveAlbumFromPlaylist()
+  const submittingRef = useRef(false)
 
   const me = useMe()
   const meId = me.data?.id
@@ -77,10 +122,65 @@ export function MainScreen() {
   )
 
   const reload = useCallback(() => {
+    setBanner(null)
     void reloadSpotifyData(queryClient)
   }, [queryClient])
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+
+  const showActions =
+    selected !== undefined && meId !== undefined && canModify(selected, meId)
+  const actionsDisabled = removeMutation.isPending || albumsQuery.isFetching
+
+  const openActions = useCallback(
+    (album: Album) => {
+      if (!selectedId || !selected) return
+      setBanner(null)
+      setSheet({ playlistId: selectedId, playlistName: selected.name, album })
+    },
+    [selectedId, selected],
+  )
+
+  const closeSheet = useCallback(() => setSheet(null), [])
+
+  const confirmRemoval = () => {
+    const snapshot = sheet
+    if (!snapshot || submittingRef.current || removeMutation.isPending) return
+    submittingRef.current = true
+    const { playlistId, playlistName, album } = snapshot
+    removeMutation.mutate(
+      { playlistId, albumId: album.id, uris: album.trackUris },
+      {
+        onSuccess: () => {
+          if (sheetRef.current !== snapshot) return
+          setSheet(null)
+          setBanner({
+            playlistId,
+            role: 'status',
+            message: `Removed ${formatTracks(album.trackCount)} from “${playlistName}”`,
+          })
+          mainRef.current?.focus()
+        },
+        onError: (error) => {
+          if (sheetRef.current !== snapshot) return
+          const refetching =
+            queryClient.isFetching({
+              queryKey: queryKeys.playlistAlbums(playlistId),
+            }) > 0
+          if (refetching) mainRef.current?.focus()
+          setSheet(null)
+          setBanner({
+            playlistId,
+            role: 'alert',
+            message: removalErrorMessage(error),
+          })
+        },
+        onSettled: () => {
+          submittingRef.current = false
+        },
+      },
+    )
+  }
 
   const handleSelect = useCallback(
     (playlistId: string) => {
@@ -95,6 +195,8 @@ export function MainScreen() {
     : me.isError || playlists.isError
       ? 'error'
       : 'loading'
+
+  const visibleBanner = banner?.playlistId === selectedId ? banner : null
 
   const title =
     selected?.name ??
@@ -160,7 +262,13 @@ export function MainScreen() {
         {visibleAlbums.length === 0 ? (
           <StatusMessage title="No albums by artists you follow" />
         ) : (
-          <AlbumList albums={visibleAlbums} getSavedState={getSavedState} />
+          <AlbumList
+            albums={visibleAlbums}
+            getSavedState={getSavedState}
+            showActions={showActions}
+            actionsDisabled={actionsDisabled}
+            onOpenActions={openActions}
+          />
         )}
       </>
     )
@@ -186,9 +294,28 @@ export function MainScreen() {
         reloading={albumsQuery.isFetching || playlists.isFetching}
         onReload={reload}
       />
-      <main className="pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        className={`pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] outline-none ${
+          visibleBanner
+            ? 'pb-[calc(env(safe-area-inset-bottom)+8rem)]'
+            : 'pb-[env(safe-area-inset-bottom)]'
+        }`}
+      >
         {renderContent()}
       </main>
+      <Banner banner={visibleBanner} onDismiss={() => setBanner(null)} />
+      {sheet && sheet.playlistId === selectedId && (
+        <AlbumActionSheet
+          album={sheet.album}
+          playlistName={sheet.playlistName}
+          pending={removeMutation.isPending}
+          onConfirm={confirmRemoval}
+          onClose={closeSheet}
+          fallbackFocusRef={mainRef}
+        />
+      )}
       <PlaylistDrawer
         id={drawerId}
         open={drawerOpen}

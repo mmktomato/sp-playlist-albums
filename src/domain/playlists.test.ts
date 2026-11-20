@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { SpotifySimplifiedPlaylist } from '../spotify/types'
 import {
   ACCESSIBILITY_METHOD,
+  canModify,
   classifyPlaylists,
   isAccessible,
   toPlaylistSummary,
@@ -149,5 +150,40 @@ describe('isAccessible', () => {
     expect(isAccessible(summaries.invited, ME, method)).toBe(true)
     expect(isAccessible(summaries.saved, ME, method)).toBe(false)
     expect(isAccessible(summaries['release-radar'], ME, method)).toBe(false)
+  })
+})
+
+describe('canModify', () => {
+  const summaries = Object.fromEntries(
+    [
+      owned,
+      ownedCollaborative,
+      saved,
+      savedCollaborative,
+      invitedCollaborator,
+      madeForYou,
+    ].map((p) => [p.id, toPlaylistSummary(p)]),
+  )
+
+  it('allows owned and collaborative playlists', () => {
+    expect(canModify(summaries.owned, ME)).toBe(true)
+    expect(canModify(summaries['owned-collab'], ME)).toBe(true)
+    expect(canModify(summaries['saved-collab'], ME)).toBe(true)
+  })
+
+  it('rejects playlists owned by others that are not collaborative', () => {
+    expect(canModify(summaries.saved, ME)).toBe(false)
+    expect(canModify(summaries.invited, ME)).toBe(false)
+    expect(canModify(summaries['release-radar'], ME)).toBe(false)
+  })
+
+  it('ignores the items field', () => {
+    const withItems = toPlaylistSummary(
+      playlist('other-with-items', {
+        owner: { id: 'someone', display_name: 'Someone' },
+      }),
+    )
+    expect(withItems.hasItemsField).toBe(true)
+    expect(canModify(withItems, ME)).toBe(false)
   })
 })

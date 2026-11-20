@@ -63,9 +63,18 @@ function CoverPlaceholder() {
 type AlbumCardProps = {
   album: Album
   saved: SavedState
+  showActions?: boolean
+  actionsDisabled?: boolean
+  onOpenActions?: (album: Album) => void
 }
 
-export function AlbumCard({ album, saved }: AlbumCardProps) {
+export function AlbumCard({
+  album,
+  saved,
+  showActions = false,
+  actionsDisabled = false,
+  onOpenActions,
+}: AlbumCardProps) {
   const [imageFailed, setImageFailed] = useState(false)
   const showImage = album.imageUrl !== undefined && !imageFailed
   const artistNames = album.artists.map((artist) => artist.name).join(', ')
@@ -75,36 +84,61 @@ export function AlbumCard({ album, saved }: AlbumCardProps) {
       : null
 
   return (
-    <a
-      href={album.url}
-      className="flex items-center gap-3 px-3 py-2 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-green-500 dark:hover:bg-neutral-900"
-    >
-      <div className="size-14 shrink-0 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
-        {showImage ? (
-          <img
-            src={album.imageUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={() => setImageFailed(true)}
-            className="size-full object-cover"
-          />
-        ) : (
-          <CoverPlaceholder />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{album.name}</p>
-        {artistNames && (
-          <p className="truncate text-xs text-neutral-600 dark:text-neutral-400">
-            {artistNames}
-          </p>
-        )}
-        {trackTotal && <p className="text-xs text-neutral-500">{trackTotal}</p>}
-      </div>
-      <div className="flex size-6 shrink-0 items-center justify-center">
-        <Heart state={saved} />
-      </div>
-    </a>
+    <div className="flex items-center">
+      <a
+        href={album.url}
+        className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-green-500 dark:hover:bg-neutral-900"
+      >
+        <div className="size-14 shrink-0 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
+          {showImage ? (
+            <img
+              src={album.imageUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageFailed(true)}
+              className="size-full object-cover"
+            />
+          ) : (
+            <CoverPlaceholder />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{album.name}</p>
+          {artistNames && (
+            <p className="truncate text-xs text-neutral-600 dark:text-neutral-400">
+              {artistNames}
+            </p>
+          )}
+          {trackTotal && (
+            <p className="text-xs text-neutral-500">{trackTotal}</p>
+          )}
+        </div>
+        <div className="flex size-6 shrink-0 items-center justify-center">
+          <Heart state={saved} />
+        </div>
+      </a>
+      {showActions && (
+        <button
+          type="button"
+          aria-label={`More actions for ${album.name}`}
+          aria-haspopup="dialog"
+          disabled={actionsDisabled}
+          onClick={() => onOpenActions?.(album)}
+          className="mr-1 flex size-10 shrink-0 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-200 focus-visible:outline-2 focus-visible:outline-green-500 disabled:opacity-40 disabled:hover:bg-transparent dark:text-neutral-400 dark:hover:bg-neutral-800"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            fill="currentColor"
+            className="size-5"
+          >
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="12" cy="19" r="2" />
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }

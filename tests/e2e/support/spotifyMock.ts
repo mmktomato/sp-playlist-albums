@@ -18,10 +18,13 @@ export type MockResponse = {
 
 export type MockResult = MockResponse | 'abort'
 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
 export type ApiRequestRecord = {
   method: string
   url: URL
   authorization: string | null
+  body: unknown
 }
 
 export type InterceptHandler = (
@@ -30,6 +33,7 @@ export type InterceptHandler = (
 ) => MockResult | Promise<MockResult>
 
 type Interceptor = {
+  method: HttpMethod
   match: (url: URL) => boolean
   handle: InterceptHandler
 }
@@ -141,6 +145,7 @@ export class SpotifyMock {
   offline = false
   tokenResponder: TokenResponder = defaultTokenResponder
   private readonly interceptors: Interceptor[] = []
+  private snapshotCount = 0
 
   constructor(data: Dataset = createDataset()) {
     this.data = data
@@ -160,25 +165,40 @@ export class SpotifyMock {
     )
   }
 
-  intercept(match: (url: URL) => boolean, handle: InterceptHandler): void {
-    this.interceptors.unshift({ match, handle })
+  intercept(
+    match: (url: URL) => boolean,
+    handle: InterceptHandler,
+    method: HttpMethod = 'GET',
+  ): void {
+    this.interceptors.unshift({ method, match, handle })
   }
 
-  respond(pathname: string, response: MockResponse): void {
+  respond(
+    pathname: string,
+    response: MockResponse,
+    method: HttpMethod = 'GET',
+  ): void {
     this.intercept(
       (url) => url.pathname === pathname,
       () => response,
+      method,
     )
   }
 
-  requestsTo(pathname: string): URL[] {
-    return this.apiRequests
-      .filter((record) => record.url.pathname === pathname)
-      .map((record) => record.url)
+  records(method: HttpMethod, pathname?: string): ApiRequestRecord[] {
+    return this.apiRequests.filter(
+      (record) =>
+        record.method === method &&
+        (pathname === undefined || record.url.pathname === pathname),
+    )
   }
 
-  playlistItemsRequests(playlistId: string): URL[] {
-    return this.requestsTo(`/v1/playlists/${playlistId}/items`)
+  requestsTo(pathname: string, method: HttpMethod = 'GET'): URL[] {
+    return this.records(method, pathname).map((record) => record.url)
+  }
+
+  playlistItemsRequests(playlistId: string, method: HttpMethod = 'GET'): URL[] {
+    return this.requestsTo(`/v1/playlists/${playlistId}/items`, method)
   }
 
   defaultResponse(url: URL): MockResponse {
@@ -211,33 +231,81 @@ export class SpotifyMock {
     return spotifyError(500, 'Unhandled request in e2e mock')
   }
 
+  defaultDeleteResponse(url: URL, body: unknown): MockResponse {
+    const itemsMatch = PLAYLIST_ITEMS_PATH.exec(url.pathname)
+    if (itemsMatch) {
+      return this.removePlaylistItems(
+        decodeURIComponent(itemsMatch[1]),
+        body,
+        url,
+      )
+    }
+    this.unhandled.push(`DELETE ${url.href}`)
+    return spotifyError(500, 'Unhandled request in e2e mock')
+  }
+
+  private removePlaylistItems(
+    playlistId: string,
+    body: unknown,
+    url: URL,
+  ): MockResponse {
+    const entries = this.data.playlistItems.get(playlistId)
+    if (!entries) return spotifyError(403, 'Forbidden')
+    const items = (body as { items?: unknown } | null)?.items
+    if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
+      this.unhandled.push(`DELETE ${url.href} with invalid body`)
+      return spotifyError(400, 'Invalid request body')
+    }
+    const uris = new Set(items.map((item: { uri?: unknown }) => item.uri))
+    const remaining = entries.filter((entry) => {
+      const uri = (entry.item ?? entry.track)?.uri
+      return !(typeof uri === 'string' && uris.has(uri))
+    })
+    this.data.playlistItems.set(playlistId, remaining)
+    const playlist = this.data.playlists.find((p) => p.id === playlistId)
+    if (playlist?.items) playlist.items.total = remaining.length
+    this.snapshotCount += 1
+    return { body: { snapshot_id: `snapshot-${this.snapshotCount}` } }
+  }
+
+  private unhandledMethod(method: string, url: URL): MockResponse {
+    this.unhandled.push(`${method} ${url.href}`)
+    return spotifyError(405, 'Method not allowed')
+  }
+
   private async handleApi(route: Route): Promise<void> {
     const request = route.request()
     const origin = await request.headerValue('origin')
-    if (request.method() === 'OPTIONS') {
+    const method = request.method()
+    if (method === 'OPTIONS') {
       await fulfillPreflight(route, origin)
       return
     }
     const url = new URL(request.url())
     const record: ApiRequestRecord = {
-      method: request.method(),
+      method,
       url,
       authorization: await request.headerValue('authorization'),
+      body: readJsonBody(request),
     }
     this.apiRequests.push(record)
     if (this.offline) {
       await abort(route)
       return
     }
-    if (request.method() !== 'GET') {
-      this.unhandled.push(`${request.method()} ${url.href}`)
-      await fulfill(route, origin, spotifyError(405, 'Method not allowed'))
-      return
+    const interceptor = this.interceptors.find(
+      (i) => i.method === method && i.match(url),
+    )
+    let result: MockResult
+    if (interceptor) {
+      result = await interceptor.handle(url, record)
+    } else if (method === 'GET') {
+      result = this.defaultResponse(url)
+    } else if (method === 'DELETE') {
+      result = this.defaultDeleteResponse(url, record.body)
+    } else {
+      result = this.unhandledMethod(method, url)
     }
-    const interceptor = this.interceptors.find((i) => i.match(url))
-    const result = interceptor
-      ? await interceptor.handle(url, record)
-      : this.defaultResponse(url)
     if (result === 'abort') {
       await abort(route)
       return
@@ -277,6 +345,16 @@ function readForm(request: Request): URLSearchParams {
   return new URLSearchParams(request.postData() ?? '')
 }
 
+function readJsonBody(request: Request): unknown {
+  const raw = request.postData()
+  if (raw === null) return undefined
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
 function corsHeaders(origin: string | null): Record<string, string> {
   return {
     'access-control-allow-origin': origin ?? '*',
@@ -308,7 +386,7 @@ async function fulfillPreflight(
     status: 204,
     headers: {
       ...corsHeaders(origin),
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
       'access-control-allow-headers': 'authorization, content-type',
       'access-control-max-age': '600',
     },

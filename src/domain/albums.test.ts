@@ -20,14 +20,28 @@ function album(
   }
 }
 
+function trackWithUri(
+  name: string,
+  trackAlbum: SpotifySimplifiedAlbum | null,
+  uri: string | null | undefined,
+): SpotifyPlaylistItem {
+  return {
+    is_local: false,
+    item: {
+      type: 'track',
+      id: name,
+      name,
+      album: trackAlbum,
+      ...(uri === undefined ? {} : { uri }),
+    },
+  }
+}
+
 function track(
   name: string,
   trackAlbum: SpotifySimplifiedAlbum | null,
 ): SpotifyPlaylistItem {
-  return {
-    is_local: false,
-    item: { type: 'track', id: name, name, album: trackAlbum },
-  }
+  return trackWithUri(name, trackAlbum, `spotify:track:${name}`)
 }
 
 describe('aggregateAlbums', () => {
@@ -69,6 +83,8 @@ describe('aggregateAlbums', () => {
       artists: [{ id: 'artist-A', name: 'Artist A' }],
       trackCount: 1,
       totalTracks: 12,
+      trackUris: ['spotify:track:a'],
+      removable: true,
     })
   })
 
@@ -91,6 +107,73 @@ describe('aggregateAlbums', () => {
       track('a2', album('A', { total_tracks: 11 })),
     ])
     expect(result.totalTracks).toBe(10)
+  })
+
+  it('collects track URIs per album without duplicates', () => {
+    const result = aggregateAlbums([
+      track('a1', album('A')),
+      track('b1', album('B')),
+      track('a2', album('A')),
+      track('a1', album('A')),
+    ])
+    expect(result.map((a) => [a.id, a.trackCount, a.trackUris])).toEqual([
+      ['A', 3, ['spotify:track:a1', 'spotify:track:a2']],
+      ['B', 1, ['spotify:track:b1']],
+    ])
+    expect(result.every((a) => a.removable)).toBe(true)
+  })
+
+  it('never collects URIs of local tracks or episodes', () => {
+    const result = aggregateAlbums([
+      {
+        is_local: true,
+        item: {
+          type: 'track',
+          uri: 'spotify:local:x:y:z:1',
+          album: album('A'),
+        },
+      },
+      {
+        is_local: false,
+        item: {
+          type: 'episode',
+          uri: 'spotify:episode:e1',
+          album: album('A'),
+        },
+      },
+      track('a1', album('A')),
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0].trackUris).toEqual(['spotify:track:a1'])
+    expect(result[0].removable).toBe(true)
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a local URI', 'spotify:local:Artist:Album:Title:180'],
+    ['an episode URI', 'spotify:episode:e1'],
+    ['a malformed track URI', 'spotify:track:abc/def'],
+    ['an empty track id', 'spotify:track:'],
+  ])('marks the album unremovable when a URI is %s', (_, uri) => {
+    const [result] = aggregateAlbums([
+      track('a1', album('A')),
+      trackWithUri('a2', album('A'), uri),
+    ])
+    expect(result.trackCount).toBe(2)
+    expect(result.trackUris).toEqual(['spotify:track:a1'])
+    expect(result.removable).toBe(false)
+  })
+
+  it('keeps other albums removable when one album has a bad URI', () => {
+    const result = aggregateAlbums([
+      trackWithUri('a1', album('A'), null),
+      track('b1', album('B')),
+    ])
+    expect(result.map((a) => [a.id, a.removable])).toEqual([
+      ['A', false],
+      ['B', true],
+    ])
   })
 
   it('falls back to the deprecated track key', () => {
