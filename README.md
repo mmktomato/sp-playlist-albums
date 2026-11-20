@@ -18,7 +18,7 @@ A mobile web app (PWA) that lists the albums in a Spotify playlist, without dupl
 Spotify restricts apps in Development Mode.
 
 - Only playlists you own or collaborate on can be read.
-  - Other playlists are grayed out.
+  - Other playlists are hidden from the menu.
   - Made for You playlists such as Release Radar don't work. Copy their tracks into your own playlist instead.
 - Up to 5 users, all with Spotify Premium.
 - You need to log in again every 6 months.
