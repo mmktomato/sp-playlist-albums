@@ -11,6 +11,7 @@ export type Album = {
   imageUrl?: string
   artists: AlbumArtist[]
   trackCount: number
+  totalTracks?: number
 }
 
 export type PlaylistSummary = {

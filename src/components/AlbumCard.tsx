@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Album } from '../domain/types'
+import { formatTracks } from './formatTracks'
 
 export type SavedState = 'saved' | 'unsaved' | 'loading' | 'unknown'
 
@@ -68,6 +69,10 @@ export function AlbumCard({ album, saved }: AlbumCardProps) {
   const [imageFailed, setImageFailed] = useState(false)
   const showImage = album.imageUrl !== undefined && !imageFailed
   const artistNames = album.artists.map((artist) => artist.name).join(', ')
+  const trackTotal =
+    typeof album.totalTracks === 'number' && Number.isFinite(album.totalTracks)
+      ? formatTracks(album.totalTracks)
+      : null
 
   return (
     <a
@@ -95,6 +100,7 @@ export function AlbumCard({ album, saved }: AlbumCardProps) {
             {artistNames}
           </p>
         )}
+        {trackTotal && <p className="text-xs text-neutral-500">{trackTotal}</p>}
       </div>
       <div className="flex size-6 shrink-0 items-center justify-center">
         <Heart state={saved} />

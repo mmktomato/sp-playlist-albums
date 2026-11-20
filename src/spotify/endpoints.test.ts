@@ -99,7 +99,7 @@ describe('getPlaylistItems', () => {
 
   it('uses the planned fields expression', () => {
     expect(PLAYLIST_ITEMS_FIELDS).toBe(
-      'items(is_local,item(type,album(id,name,uri,images,artists(id,name))),track(type,album(id,name,uri,images,artists(id,name)))),next,total',
+      'items(is_local,item(type,album(id,name,uri,images,artists(id,name),total_tracks)),track(type,album(id,name,uri,images,artists(id,name),total_tracks))),next,total',
     )
   })
 

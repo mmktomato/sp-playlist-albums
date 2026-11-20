@@ -79,6 +79,7 @@ export type SpotifySimplifiedAlbum = {
   uri: string | null
   images?: SpotifyImage[]
   artists?: SpotifySimplifiedArtist[]
+  total_tracks?: number
 }
 
 export type SpotifyTrack = {

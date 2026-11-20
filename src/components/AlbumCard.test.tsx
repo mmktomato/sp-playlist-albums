@@ -76,4 +76,17 @@ describe('AlbumCard', () => {
     render(<AlbumCard album={album} saved="unknown" />)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  it.each([
+    [12, '12 tracks'],
+    [1, '1 track'],
+  ])('shows %i album tracks inside the link', (totalTracks, text) => {
+    render(<AlbumCard album={{ ...album, totalTracks }} saved="saved" />)
+    expect(screen.getByRole('link')).toContainElement(screen.getByText(text))
+  })
+
+  it('omits the track count line when the total is missing', () => {
+    render(<AlbumCard album={album} saved="saved" />)
+    expect(screen.queryByText(/\btracks?\b/)).not.toBeInTheDocument()
+  })
 })

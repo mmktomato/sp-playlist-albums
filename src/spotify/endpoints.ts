@@ -18,8 +18,9 @@ import type {
 export const PAGE_LIMIT = 50
 export const LIBRARY_CONTAINS_CHUNK_SIZE = 40
 
-const ALBUM_FIELDS = 'type,album(id,name,uri,images,artists(id,name))'
-export const PLAYLIST_ITEMS_FIELDS = `items(is_local,item(${ALBUM_FIELDS}),track(${ALBUM_FIELDS})),next,total`
+const CONTENT_FIELDS =
+  'type,album(id,name,uri,images,artists(id,name),total_tracks)'
+export const PLAYLIST_ITEMS_FIELDS = `items(is_local,item(${CONTENT_FIELDS}),track(${CONTENT_FIELDS})),next,total`
 
 export function entryTrack(
   entry: SpotifyPlaylistItem | null | undefined,

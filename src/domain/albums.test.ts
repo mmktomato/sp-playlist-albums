@@ -57,8 +57,10 @@ describe('aggregateAlbums', () => {
   })
 
   it('maps album fields', () => {
-    const [result] = aggregateAlbums([track('a', album('A'))])
-    expect(result).toEqual({
+    const [result] = aggregateAlbums([
+      track('a', album('A', { total_tracks: 12 })),
+    ])
+    expect(result).toStrictEqual({
       id: 'A',
       name: 'Album A',
       uri: 'spotify:album:A',
@@ -66,7 +68,29 @@ describe('aggregateAlbums', () => {
       imageUrl: 'https://i.scdn.co/A',
       artists: [{ id: 'artist-A', name: 'Artist A' }],
       trackCount: 1,
+      totalTracks: 12,
     })
+  })
+
+  it('leaves totalTracks undefined when total_tracks is missing or not a number', () => {
+    const result = aggregateAlbums([
+      track('a', album('A')),
+      track('b', album('B', { total_tracks: '7' as unknown as number })),
+      track('c', album('C', { total_tracks: Number.NaN })),
+    ])
+    expect(result.map((a) => a.totalTracks)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('takes totalTracks from the first appearance of the album', () => {
+    const [result] = aggregateAlbums([
+      track('a1', album('A', { total_tracks: 10 })),
+      track('a2', album('A', { total_tracks: 11 })),
+    ])
+    expect(result.totalTracks).toBe(10)
   })
 
   it('falls back to the deprecated track key', () => {

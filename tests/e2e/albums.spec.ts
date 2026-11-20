@@ -5,8 +5,11 @@ import {
   BRAVO,
   CHARLIE,
   FOLLOWED_FILLER_COUNT,
+  OTHER_ARTIST,
   PLAYLISTS,
+  album,
   imageUrl,
+  trackEntry,
 } from './support/data.ts'
 import { expect, test } from './support/fixtures.ts'
 
@@ -126,6 +129,34 @@ test('follow filter keeps only albums whose album artists are followed', async (
   expect(spotify.requestsTo('/v1/me/following')).toHaveLength(
     followingRequests.length,
   )
+})
+
+test('album cards show the total track count of the album', async ({
+  page,
+  spotify,
+}) => {
+  const golf = {
+    ...album('golf', 'Golf Album', [OTHER_ARTIST]),
+    total_tracks: undefined,
+  }
+  spotify.data.playlistItems
+    .get(PLAYLISTS.mine.id)!
+    .push(trackEntry('t-golf', golf))
+
+  await page.goto(`./?playlist=${PLAYLISTS.mine.id}`)
+  await expect(page.getByText('4 / 4 albums')).toBeVisible()
+
+  await expect(
+    albumLink(page, ALPHA.name).getByText('12 tracks', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    albumLink(page, BRAVO.name).getByText('1 track', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    albumLink(page, CHARLIE.name).getByText('8 tracks', { exact: true }),
+  ).toBeVisible()
+  await expect(albumLink(page, golf.name)).toBeVisible()
+  await expect(albumLink(page, golf.name)).not.toContainText(/\btracks?\b/)
 })
 
 test('album cards link to the album on open.spotify.com', async ({ page }) => {

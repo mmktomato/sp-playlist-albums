@@ -44,7 +44,10 @@ export function album(
   id: string,
   name: string,
   artists: SpotifySimplifiedArtist[],
-  { image = true }: { image?: boolean } = {},
+  {
+    image = true,
+    totalTracks = 10,
+  }: { image?: boolean; totalTracks?: number } = {},
 ): SpotifySimplifiedAlbum {
   return {
     id,
@@ -52,6 +55,7 @@ export function album(
     uri: `spotify:album:${id}`,
     images: image ? [{ url: imageUrl(id), width: 300, height: 300 }] : [],
     artists,
+    total_tracks: totalTracks,
   }
 }
 
@@ -141,10 +145,15 @@ export const FOLLOWED_ARTIST = artist('artist-followed', 'Followed Artist')
 export const OTHER_ARTIST = artist('artist-other', 'Other Artist')
 export const THIRD_ARTIST = artist('artist-third', 'Third Artist')
 
-export const ALPHA = album('alpha', 'Alpha Album', [FOLLOWED_ARTIST])
-export const BRAVO = album('bravo', 'Bravo Album', [OTHER_ARTIST])
+export const ALPHA = album('alpha', 'Alpha Album', [FOLLOWED_ARTIST], {
+  totalTracks: 12,
+})
+export const BRAVO = album('bravo', 'Bravo Album', [OTHER_ARTIST], {
+  totalTracks: 1,
+})
 export const CHARLIE = album('charlie', 'Charlie Album', [THIRD_ARTIST], {
   image: false,
+  totalTracks: 8,
 })
 export const DELTA = album('delta', 'Delta Album', [OTHER_ARTIST])
 export const ECHO = album('echo', 'Echo Album', [THIRD_ARTIST])

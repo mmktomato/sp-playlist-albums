@@ -5,6 +5,10 @@ import type {
 import { pickImageUrl } from './images'
 import type { Album, AlbumArtist } from './types'
 
+function toTotalTracks(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 export function albumUrl(id: string): string {
   return `https://open.spotify.com/album/${id}`
 }
@@ -42,6 +46,7 @@ export function aggregateAlbums(
       imageUrl: pickImageUrl(album.images),
       artists: toAlbumArtists(album),
       trackCount: 1,
+      totalTracks: toTotalTracks(album.total_tracks),
     })
   }
   return [...albums.values()]
